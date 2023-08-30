@@ -1,6 +1,5 @@
 #include "Audio.h"
 #include "secrets.h"
-#include "myencoder.h"
 
 #define I2S_DOUT     27
 #define I2S_BCLK     26
@@ -9,7 +8,8 @@
 
 
 Audio audio;
-MyEncoder encoder;
+unsigned long old_millis = 0;
+uint8_t station = 0;
 
 
 void setup() {
@@ -18,17 +18,10 @@ void setup() {
   WiFi.disconnect();
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(1500);
-    Serial.print(".");
-  }
-  Serial.println(" connected");
-  encoder.begin();
-  encoder.setPos(5);
-  encoder.setLimits(0, 20);
-  encoder.setLev(0);
+  while (WiFi.status() != WL_CONNECTED) delay(1500);
+  Serial.println("connected");
   audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
-  audio.setVolume(encoder.readPos());
+  audio.setVolume(5);
   if (audio.connecttohost("http://stream.lokalradio.nrw/4459m27")) {
     Serial.println("Radio Kiepenkerl");
   }
@@ -36,12 +29,8 @@ void setup() {
 
 void loop() {
   audio.loop();
-  encoder.loop();
-  if (encoder.newPos()) {
-    audio.setVolume(encoder.readPos());
-  }
-  if ( encoder.newLev() ) {
-    switch (encoder.readLev()) {
+  if ( ( millis() - old_millis ) > 30000 ) {
+    switch (station)    {
     case 0:
       if (audio.connecttohost("http://stream.lokalradio.nrw/4459m27")) {
         Serial.println("Radio Kiepenkerl");
@@ -55,6 +44,9 @@ void loop() {
     default:
       break;
     }
+    station++;
+    if ( station > 1 ) station = 0;
+    old_millis = millis();
   }
 
 }
