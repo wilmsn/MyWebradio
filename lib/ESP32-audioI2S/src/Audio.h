@@ -3,13 +3,10 @@
  *
  *  Created on: Oct 28,2018
  *
- *  Version 3.0.6
- *  Updated on: Aug 05.2023
+ *  Version 3.0.7
+ *  Updated on: Oct 08.2023
  *      Author: Wolle (schreibfaul1)
  */
-
-//#define SDFATFS_USED  // activate for SdFat
-
 
 #pragma once
 #pragma GCC optimize ("Ofast")
@@ -17,58 +14,18 @@
 #include <Arduino.h>
 #include <libb64/cencode.h>
 #include <esp32-hal-log.h>
-
 #include <SPI.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <vector>
 #include <driver/i2s.h>
-
-#ifdef SDFATFS_USED
-#include <SdFat.h>  // https://github.com/greiman/SdFat
-#else
 #include <SD.h>
 #include <SD_MMC.h>
 #include <SPIFFS.h>
 #include <FS.h>
 #include <FFat.h>
-#endif // SDFATFS_USED
-
-
-#ifdef SDFATFS_USED
-//typedef File32 File;
-typedef FsFile File;
-
-namespace fs {
-    class FS : public SdFat {
-    public:
-        bool begin(SdCsPin_t csPin = SS, uint32_t maxSck = SD_SCK_MHZ(25)) { return SdFat::begin(csPin, maxSck); }
-    };
-
-    class SDFATFS : public fs::FS {
-    public:
-        // sdcard_type_t cardType();
-        uint64_t cardSize() {
-            return totalBytes();
-        }
-        uint64_t usedBytes() {
-            // set SdFatConfig MAINTAIN_FREE_CLUSTER_COUNT non-zero. Then only the first call will take time.
-            return (uint64_t)(clusterCount() - freeClusterCount()) * (uint64_t)bytesPerCluster();
-        }
-        uint64_t totalBytes() {
-            return (uint64_t)clusterCount() * (uint64_t)bytesPerCluster();
-        }
-    };
-}
-
-extern fs::SDFATFS SD_SDFAT;
-
-using namespace fs;
-#define SD SD_SDFAT
-#endif //SDFATFS_USED
 
 using namespace std;
-
 
 extern __attribute__((weak)) void audio_info(const char*);
 extern __attribute__((weak)) void audio_id3data(const char*); //ID3 metadata
@@ -168,7 +125,6 @@ public:
     void setBufsize(int rambuf_sz, int psrambuf_sz);
     bool connecttohost(const char* host, const char* user = "", const char* pwd = "");
     bool connecttospeech(const char* speech, const char* lang);
-    bool connecttomarytts(const char* speech, const char* lang, const char* voice);
     bool connecttoFS(fs::FS &fs, const char* path, int32_t resumeFilePos = -1);
     bool connecttoSD(const char* path, int32_t resumeFilePos = -1);
     bool setFileLoop(bool input);//TEST loop
@@ -374,7 +330,7 @@ private:
     }
 
     int specialIndexOf (uint8_t* base, const char* str, int baselen, bool exact = false){
-        int result;  // seek for str in buffer or in header up to baselen, not nullterninated
+        int result = 0;  // seek for str in buffer or in header up to baselen, not nullterninated
         if (strlen(str) > baselen) return -1; // if exact == true seekstr in buffer must have "\0" at the end
         for (int i = 0; i < baselen - strlen(str); i++){
             result = i;
@@ -407,7 +363,7 @@ private:
             base64_encodestate _state;
             base64_init_encodestate(&_state);
             int len = base64_encode_block(&source[0], sourceLength, &buffer[0], &_state);
-            len = base64_encode_blockend((buffer + len), &_state);
+            base64_encode_blockend((buffer + len), &_state);
             memcpy(dest, buffer, strlen(buffer));
             dest[strlen(buffer)] = '\0';
             free(buffer);
