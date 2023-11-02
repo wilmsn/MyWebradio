@@ -4,18 +4,19 @@
  *    ------             -------
  *    3V3                VCC
  *    GND                GND 
- *    GPIO 33            KEY
- *    GPIO 34            S1
- *    GPIO 35            S2
+ *    GPIO             KEY
+ *    GPIO             S1
+ *    GPIO             S2
  ********************************************************/
 #include "myencoder.h"
+#ifdef _MYENCODER_H_
 #include "AiEsp32RotaryEncoder.h"
 
-#define SERIAL_DEBUG
+//#define SERIAL_DEBUG
 
-#define ROTARY_ENCODER_A_PIN      34
-#define ROTARY_ENCODER_B_PIN      35
-#define ROTARY_ENCODER_BUTTON_PIN 4
+#define ROTARY_ENCODER_A_PIN      19
+#define ROTARY_ENCODER_B_PIN      18
+#define ROTARY_ENCODER_BUTTON_PIN 5
 
 #define ROTARY_ENCODER_VCC_PIN -1 /* 27 put -1 of Rotary encoder Vcc is connected directly to 3,3V; else you can use declared output pin for powering rotary encoder */
 //depending on your encoder - try 1,2 or 4 to get expected behaviour
@@ -25,26 +26,20 @@
 //instance for rotary encoder
 AiEsp32RotaryEncoder rotary = AiEsp32RotaryEncoder(ROTARY_ENCODER_A_PIN, ROTARY_ENCODER_B_PIN, ROTARY_ENCODER_BUTTON_PIN, ROTARY_ENCODER_VCC_PIN, ROTARY_ENCODER_STEPS);
 
-unsigned long shortPressAfterMiliseconds = 50;   //how long short press shoud be. Do not set too low to avoid bouncing (false press events).
-unsigned long longPressAfterMiliseconds = 1000;  //how long čong press shoud be.
-
 //interrupt handling for rotary encoder
 void IRAM_ATTR readRotaryISR() {
   rotary.readEncoder_ISR();
 }
 
-void MyEncoder::setLimits(uint8_t minLim, uint8_t maxLim) {
-  rotary.setBoundaries(minLim, maxLim, false);
-#ifdef SERIAL_DEBUG
-  Serial.print("Encoder Limits: ");
-  Serial.print(minLim);
-  Serial.print(" ");
-  Serial.println(maxLim);
-#endif  
+void MyEncoder::initLev(uint8_t lev, uint8_t pos, uint8_t min, uint8_t max) {
+    levStore[lev].curPos = pos;
+    levStore[lev].minPos = min;
+    levStore[lev].maxPos = max;
 }
 
 void MyEncoder::setPos(uint8_t newPos) {
   rotary.setEncoderValue(newPos);
+  levStore[curLev].curPos = newPos;
   curPos = newPos;
 #ifdef SERIAL_DEBUG
   Serial.print("Encoder new Pos: ");
@@ -59,17 +54,23 @@ bool MyEncoder::newPos() {
 }
 
 uint8_t MyEncoder::readPos() {
-  posChanged = false;
 #ifdef SERIAL_DEBUG
   Serial.print("Encoder read Pos: ");
   Serial.println(curPos);
 #endif
-  curPos = rotary.readEncoder();
+  levStore[curLev].curPos = curPos;
+  posChanged = false;
   return curPos;
 }
 
 void MyEncoder::setLev(uint8_t newLev) {
-  curLev = newLev;
+  if ( newLev < NUMLEVEL ) {
+    levStore[curLev].curPos = curPos;
+    curLev = newLev;
+    curPos = levStore[curLev].curPos;
+    rotary.setEncoderValue(curPos);
+    rotary.setBoundaries(levStore[curLev].minPos, levStore[curLev].maxPos, false);
+  }
 }
 
 bool MyEncoder::newLev() {
@@ -111,44 +112,47 @@ void MyEncoder::begin(uint8_t startPos) {
 void MyEncoder::begin() {
   rotary.begin(); //satrencoder handling
   rotary.setup(readRotaryISR); //register interrupt service routine
-  rotary.setBoundaries(0, 100, false); //minValue, maxValue, circleValues true|false (when max go to min and vice versa)
+  rotary.setBoundaries(levStore[curLev].minPos, levStore[curLev].maxPos, false); //minValue, maxValue, circleValues true|false (when max go to min and vice versa)
   rotary.setEncoderValue(curPos); //preset the value to current gain
 }
 
 void MyEncoder::loop() {
   if (rotary.encoderChanged()) {
     curPos = rotary.readEncoder(); //get new value for gain
+    levStore[curLev].curPos = curPos;
     posChanged = true;
   }
-  static unsigned long lastTimeButtonDown = 0;
-  static bool wasButtonDown = false;
-
-  bool isEncoderButtonDown = rotary.isEncoderButtonDown();
-  //isEncoderButtonDown = !isEncoderButtonDown; //uncomment this line if your button is reversed
-
-  if (isEncoderButtonDown) {
+  
+  if (rotary.isEncoderButtonDown()) {
+#ifdef SERIAL_DEBUG
     Serial.println("Button down");
-    if (!wasButtonDown) {
-      //start measuring
-      lastTimeButtonDown = millis();
+#endif
+    if (buttonDownStartTime == 0) {
+      buttonDownStartTime = millis();
     }
-    //else we wait since button is still down
-    wasButtonDown = true;
-    return;
-  }
-
-  //button is up
-  if (wasButtonDown) {
-    //click happened, lets see if it was short click, long click or just too short
-    if (millis() - lastTimeButtonDown >= longPressAfterMiliseconds) {
-      longClicked = true;
-    } else if (millis() - lastTimeButtonDown >= shortPressAfterMiliseconds) {
-      shortClicked = true;
-      curLev++;
-      if (curLev > maxLev) curLev = 0;
+  } else {
+    if ( buttonDownStartTime > 0) {
+      unsigned long deltaTime = millis() - buttonDownStartTime;
+      if ( (deltaTime > minPressTime) && (deltaTime < shortPressTime) ) {
+        if ( curLev > (NUMLEVEL -2)) {
+          setLev(0);
+        } else {
+          setLev(curLev+1);
+        }
+        levChanged = true;
+        shortClicked = true;
+      }
+      if ( deltaTime > longPressTime) {
+        longClicked = true;
+      }
+#ifdef SERIAL_DEBUG
+      if (longClicked) Serial.println("Longclick detected");
+      if (shortClicked) Serial.println("Shortclick detected");
+#endif
+      buttonDownStartTime = 0;
     }
   }
-  wasButtonDown = false;
 }
 
 
+#endif
