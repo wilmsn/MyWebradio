@@ -34,7 +34,7 @@ class MyEncoder {
 public:
 
 void begin();
-void begin(uint8_t startPos);
+
 void loop();
 
 void initLev(uint8_t lev, uint8_t pos, uint8_t min, uint8_t max);
@@ -52,11 +52,10 @@ bool isLongClicked();
 bool isShortClicked(); 
 
 private:
-uint8_t curPos = 0;
+uint8_t curPos;
 levStore_t levStore[NUMLEVEL];
 bool posChanged = false;
 uint8_t curLev = 0;
-uint8_t maxLev = 0;
 bool levChanged = false;
 bool shortClicked = false;
 bool longClicked = false;
