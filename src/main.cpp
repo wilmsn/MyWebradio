@@ -1,6 +1,7 @@
 #include "secrets.h"
 #include <WiFi.h> 
-#include "myencoder.h"
+#include "mydisplay.h"
+#include "Audio.h"
 
 #define STATIONS_NUM          10
 #define STATIONS_URL_SIZE     150
@@ -13,8 +14,16 @@ struct station_t
 };
 
 station_t station[STATIONS_NUM];
+uint8_t stationNo = 0;
 
-MyEncoder encoder;
+MyDisplay display;
+Audio audio;
+
+
+char ntp[] = "de.pool.ntp.org";
+struct tm timeinfo;
+
+uint8_t test_vol = 0;
 
 void initStations() {
   
@@ -30,86 +39,114 @@ void initStations() {
   strncpy(station[3].url,"http://rnrw.cast.addradio.de/rnrw-0182/dein90er/low/stream.mp3",STATIONS_URL_SIZE);
   strncpy(station[3].name,"NRW 90er",STATIONS_NAME_SIZE);
   
-  strncpy(station[4].name,"fill me",STATIONS_NAME_SIZE);
-  strncpy(station[5].name,"fill me",STATIONS_NAME_SIZE);
-  strncpy(station[6].name,"fill me",STATIONS_NAME_SIZE);
-  strncpy(station[7].name,"fill me",STATIONS_NAME_SIZE);
-  strncpy(station[8].name,"fill me",STATIONS_NAME_SIZE);
-  strncpy(station[9].name,"fill me",STATIONS_NAME_SIZE);
+  strncpy(station[4].url,"http://dispatcher.rndfnk.com/br/br3/live/mp3/low",STATIONS_URL_SIZE);
+  strncpy(station[4].name,"Bayern3",STATIONS_NAME_SIZE);
 
+  strncpy(station[5].url,"http://dispatcher.rndfnk.com/hr/hr3/live/mp3/48/stream.mp3",STATIONS_URL_SIZE);
+  strncpy(station[5].name,"Hessen3",STATIONS_NAME_SIZE);
+
+  strncpy(station[6].url,"http://radiohagen.cast.addradio.de/radiohagen/simulcast/high/stream.mp3",STATIONS_URL_SIZE);
+  strncpy(station[6].name,"Radio Hagen",STATIONS_NAME_SIZE);
+
+  strncpy(station[7].url,"http://wdr-1live-live.icecast.wdr.de/wdr/1live/live/mp3/128/stream.mp3",STATIONS_URL_SIZE);
+  strncpy(station[7].name,"WDR1",STATIONS_NAME_SIZE);
+
+  strncpy(station[8].url,"http://icecast.ndr.de/ndr/ndr1niedersachsen/hannover/mp3/128/stream.mp3",STATIONS_URL_SIZE);
+  strncpy(station[8].name,"NDR1 Hannover",STATIONS_NAME_SIZE);
+
+  strncpy(station[9].url,"http://icecast.ndr.de/ndr/ndr2/niedersachsen/mp3/128/stream.mp3",STATIONS_URL_SIZE);
+  strncpy(station[9].name,"NDR2 Niedersachsen",STATIONS_NAME_SIZE);
+
+}
+
+void audio_info(const char *info){
+    Serial.println("****Info****");
+    Serial.println(info);
+    Serial.println("---------------");
+}
+
+void audio_showstreamtitle(const char *info){
+    String sinfo = String(info);
+    sinfo.replace("|", "\n");
+    Serial.println("####Titel####");
+    Serial.println(String(info));
+    Serial.println("-------------");
+    display.displayTitle(String(info));
+}
+
+void audio_bitrate(const char *info) {
+    Serial.println("####Bitrate####");
+    Serial.println(String(info));
+    Serial.println("-------------");
+}
+
+void audio_showstation(const char *info){
+    String sinfo = String(info);
+    sinfo.replace("|", "\n");
+    Serial.println("####Station####");
+    Serial.println(String(info));
+    Serial.println("-------------");
+//    display.displayTitle(sinfo);
 }
 
 void setup() {
   Serial.begin(115200);
   Serial.print("WiFi ");
+  display.begin();
+  display.displayWifi(ssid,false);
   WiFi.disconnect();
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
+  uint8_t i=0;
   while (WiFi.status() != WL_CONNECTED) {
     delay(1500);
+    i++;
+    display.displayWifiCon(i);
     Serial.print(".");
   }
-  Serial.println(" connected");
-  encoder.initLev(0,5,0,20);
-  encoder.initLev(1,0,0,STATIONS_NUM-1);
-  encoder.initLev(2,0,0,100);
-  encoder.begin();
+  Serial.println();
+  Serial.println("connected");
+  display.displayWifi(ssid,true);
+  delay(500);
   initStations();
- }
+  configTzTime("CET-1CEST,M3.5.0/03,M10.5.0/03", ntp);
+  if (! getLocalTime(&timeinfo)) ESP.restart();
+  audio.connecttohost(station[0].url);
+  display.radioLayout();
+  display.displayStation(station[stationNo].name);
+}
 
 void actionLevel_0() {
   Serial.print("Lautstärke: ");
-  Serial.println(encoder.readPos());
 }
 
 void actionLevel_1() {
   Serial.print("Station: ");
-  Serial.println(station[encoder.readPos()].name);
 }
 
 void actionLevel_2() {
   Serial.print("Level 3: ");
-  Serial.println(encoder.readPos());
 }
 
 void loop() {
-  encoder.loop();
-  if (encoder.newPos()) {
-    Serial.print("Level: ");
-    Serial.print(encoder.readLev());
-    Serial.print(" Position: ");
-    Serial.println(encoder.readPos());
-    switch (encoder.readLev()) {
-      case 0:
-        actionLevel_0();
-      break;
-      case 1:
-        actionLevel_1();
-      break;
-      case 2:
-        actionLevel_2();
-      break;
-      default:
-      break;
+  audio.loop();
+  char sttime[21];
+  if (getLocalTime(&timeinfo)) {
+    //get date and time as a string
+    strftime(sttime, sizeof(sttime), "%d. %b %Y %H:%M", &timeinfo);
+  } else {
+    snprintf(sttime,sizeof(sttime),"%s","??. ??? ???? ??:??");
+  }
+  display.displayHeader(sttime, test_vol);
+  delay(1000);
+  test_vol++;
+  if (test_vol == 95 ) {
+    stationNo++;
+    if (stationNo > STATIONS_NUM-1) stationNo = 0;
+    if (audio.connecttohost(station[stationNo].url)) {
+        display.displayStation(station[stationNo].name);
+        display.displayTitle("");
     }
   }
-  if ( encoder.newLev() ) {
-    Serial.print("Level geschaltet: ");
-    Serial.print(encoder.readLev());
-    Serial.print(" Position: ");
-    Serial.println(encoder.readPos());
-    switch (encoder.readLev()) {
-      case 0:
-        actionLevel_0();
-      break;
-      case 1:
-        actionLevel_1();
-      break;
-      case 2:
-        actionLevel_2();
-      break;
-      default:
-      break;
-    }
-  }
+  if (test_vol > 100) test_vol = 0;
 }
