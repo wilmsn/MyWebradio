@@ -16,7 +16,7 @@
 #include <Arduino.h>
 #include <Adafruit_GFX.h>    // Core graphics library
 #include <Adafruit_ST7735.h> // Hardware-specific library for ST7735
-#include <Fonts/FreeSans9pt7b.h>
+//#include <Fonts/FreeSans9pt7b.h>
 #include <SPI.h>
 
 #define TFT_SCK    18  //SCK
@@ -48,21 +48,18 @@ void MyDisplay::begin() {
   tft.enableDisplay(true);        // Enable display
   tft.fillScreen(ST7735_BLACK);
   tft.setRotation(3);
-}
-
-void MyDisplay::loop() {
-  
+  clear();
 }
 
 void MyDisplay::clear() {
-  tft.fillRect(0,0,168,120,ST77XX_BLACK);
+  tft.fillRect(0,0,160,128,ST77XX_BLACK);
 }
 
-void MyDisplay::infoLayout() {
-  tft.setTextSize(3);
-  tft.setTextColor(ST7735_RED);
-  tft.setCursor(0, 50);
-  tft.print("InfoLayout");
+void MyDisplay::DisplayText(uint8_t x0, uint8_t y0, uint8_t fontsize, String& text, uint16_t color) {
+  tft.setTextSize(fontsize);
+  tft.setTextColor(color);
+  tft.setCursor(x0, y0);
+  tft.print(text);
 }
 
 void MyDisplay::displayWifiCon(uint8_t waitCount) {
@@ -76,12 +73,12 @@ void MyDisplay::displayWifiCon(uint8_t waitCount) {
 
 void MyDisplay::displayWifi(const char* _ssid, bool isCon) {
   String ssid = String(_ssid);
-  uint8_t wifi_x = 50;
+  uint8_t wifi_y = 50;
   clear();
   if (isCon) {
     tft.setTextSize(2);
     tft.setTextColor(ST7735_WHITE);
-    tft.setCursor(80-strlen(_ssid)*5, wifi_x);
+    tft.setCursor(80-strlen(_ssid)*6, wifi_y);
     tft.print(ssid);
     tft.setTextSize(1);
     tft.setTextColor(ST7735_GREEN);
@@ -94,46 +91,133 @@ void MyDisplay::displayWifi(const char* _ssid, bool isCon) {
     tft.print("Try to connect to");
     tft.setTextSize(2);
     tft.setTextColor(ST7735_WHITE);
-    tft.setCursor(80-strlen(_ssid)*5, wifi_x);
+    tft.setCursor(80-strlen(_ssid)*6, wifi_y);
     tft.print(ssid);
   }
 }
 
-void MyDisplay::displayInfo() {
-  tft.fillRect(0,0,168,120,ST77XX_BLACK);
-}
-void MyDisplay::stationLayout() {}
-void MyDisplay::displayStationSelect(char station[5]) {}
-
-void MyDisplay::radioLayout() {
+void MyDisplay::stationLayout() {
   clear();
-  tft.drawLine(0,70,168,70,ST7735_BLUE);
+
 }
 
-void MyDisplay::displayTitle(String titleName) {
-  tft.fillRect(0,60,168,128,ST7735_BLACK);
+void MyDisplay::displayStationSelect(char* station[5]) {
   tft.setTextSize(1);
   tft.setTextColor(ST7735_WHITE);
-  tft.setCursor(0,80);
-  tft.print(String(titleName));
-  Serial.println("MyDisplay::displayTitle");
-  Serial.println(titleName);
-  Serial.println("---------------");
-  tft.drawLine(0,125,168,125,ST7735_BLUE);
+  tft.setCursor(10,20);
+  if (station[0] != NULL) tft.print(String(station[0]));
+  tft.setCursor(10,40);
+  if (station[1] != NULL) tft.print(String(station[1]));
+  tft.setCursor(10,80);
+  if (station[3] != NULL) tft.print(String(station[3]));
+  tft.setCursor(10,100);
+  if (station[4] != NULL) tft.print(String(station[4]));
+  tft.setTextSize(1);
+  tft.setTextColor(ST7735_YELLOW);
+  tft.setCursor(10,60);
+  tft.print(String(station[2]));
+  tft.drawRect(0,53,160,20,ST7735_YELLOW);
+}
+
+void MyDisplay::radioLayout() {
+/*  Folgende Aufteilung des Bildschirmes:
+0,0
+     Headline mit Datum/Zeit und Lautstärke
+                                            159,11
+--------------------------------------------------                                            
+12,0
+     Anzeige des aktuellen Senders
+                                            159,69
+--------------------------------------------------
+70,0      Trennlinie blau                   159,70
+--------------------------------------------------
+71,0
+     Anzeige des aktuellen Titels
+                                            159,114
+--------------------------------------------------
+115,0
+     Footer mit techn. Infos
+                                            159,127
+*/
+  clear();
+  tft.drawLine(0,70,159,70,ST7735_BLUE);
 }
 
 void MyDisplay::displayStation(char *stationName) {
-//  String myStation;
-  tft.fillRect(0,12,168,58,ST77XX_BLACK);
-  if (strlen(stationName)> 12) {
-    for (int i = 0; i < strlen(stationName); i++){
-      if (stationName[i] == ' ') stationName[i] = '\n';
-    }
-  }
+  char mystr1[] = "            ";
+  char mystr2[] = "            ";
+  int space2cut = 0;
+  int strlenMax = strlen(mystr1) + strlen(mystr2);
+//  tft.setFont(&FreeSans9pt7bBitmaps);
+  tft.fillRect(0,12,160,58,ST77XX_BLACK);
   tft.setTextSize(2);
   tft.setTextColor(ST7735_RED);
   tft.setCursor(5,20);
-  tft.print(String(stationName));
+  if (strlen(stationName) > strlen(mystr1)) {
+    for(int i=0; i<strlen(stationName); i++) {
+       if ( i < strlen(mystr1) && stationName[i] == ' ') space2cut = i;
+    }    
+  }
+  Serial.print("Space 2 cut:");
+  Serial.println(space2cut);
+  if (strlen(stationName) > strlen(mystr1)) {
+    if ( space2cut < strlen(mystr1)) {
+      for(int i=0; i<strlen(stationName) && i<strlenMax; i++) {
+        if ( i < space2cut) mystr1[i] = stationName[i];
+        if ( i > space2cut && i-space2cut < strlen(mystr2)) mystr2[i-space2cut-1] = stationName[i];
+      }
+    } else {
+      for(int i=0; i<strlen(stationName) && i<strlenMax; i++) {
+        if ( i < 12) mystr1[i] = stationName[i];
+        if ( i > 11) mystr2[i-strlen(mystr1)] = stationName[i];
+      }
+    }
+    tft.print(String(mystr1));
+    tft.setCursor(5,40);
+    tft.print(String(mystr2));
+  } else {
+    tft.print(String(stationName));
+  }
+  tft.setFont();
+}
+
+void MyDisplay::displayTitle(const char* titleName) {
+  char mystr1[] = "                      ";
+  char mystr2[] = "                      ";
+  uint8_t space2cut = 0;
+  int strlenMax = strlen(mystr1) + strlen(mystr2);
+  tft.fillRect(0,71,160,44,ST7735_BLACK);
+  tft.setTextSize(1);
+  tft.setTextColor(ST7735_WHITE);
+  tft.setCursor(5,80);
+  if (strlen(titleName) > strlen(mystr1)) {
+    for(int i=0; i<strlen(titleName); i++) {
+       if ( i < strlen(mystr1) && titleName[i] == ' ') space2cut = i;
+    }    
+  }
+  Serial.print("Space 2 cut:");
+  Serial.println(space2cut);
+  if (strlen(titleName) > strlen(mystr1)) {
+    if ( space2cut < strlen(mystr1)) {
+      for(int i=0; i<strlen(titleName) && i<strlenMax; i++) {
+        if ( i < space2cut) mystr1[i] = titleName[i];
+        if ( i > space2cut && i-space2cut < strlen(mystr2)) mystr2[i-space2cut-1] = titleName[i];
+      }
+    } else {
+      for(int i=0; i<strlen(titleName) && i<strlenMax; i++) {
+        if ( i < 12) mystr1[i] = titleName[i];
+        if ( i > 11) mystr2[i-strlen(mystr1)] = titleName[i];
+      }
+    }
+    tft.print(String(mystr1));
+    tft.setCursor(5,95);
+    tft.print(String(mystr2));
+  } else {
+    tft.print(String(titleName));
+  }
+  Serial.println("MyDisplay::displayTitle");
+  Serial.println(titleName);
+  Serial.println("---------------");
 }
 
 void MyDisplay::displayHeader(char* dateTime, uint8_t myVol) {
@@ -146,7 +230,7 @@ void MyDisplay::displayHeader(char* dateTime, uint8_t myVol) {
   *  myVol: zwischen 0 (=Ton aus) und 100 (=max. Lautst.)
   *  Maße: 25 Breit; 10 Hoch 
   */  
-  tft.fillRect(0,0,168,12,ST77XX_BLUE);
+  tft.fillRect(0,0,159,12,ST77XX_BLUE);
   tft.setTextSize(1);
   tft.setTextColor(ST7735_YELLOW);
   tft.setCursor(5,2);
@@ -170,8 +254,12 @@ void MyDisplay::displayHeader(char* dateTime, uint8_t myVol) {
 
 }
 
-
-
-
+void MyDisplay::displayFooter(const char* _bps) {
+  tft.fillRect(0,115,159,12,ST77XX_BLUE);
+  tft.setTextSize(1);
+  tft.setTextColor(ST7735_YELLOW);
+  tft.setCursor(2,117);
+  tft.print(String(_bps));
+}
 
 #endif

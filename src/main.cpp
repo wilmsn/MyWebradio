@@ -1,4 +1,5 @@
 #include "secrets.h"
+#include "main.h"
 #include <WiFi.h> 
 #include "mydisplay.h"
 #include "Audio.h"
@@ -71,13 +72,14 @@ void audio_showstreamtitle(const char *info){
     Serial.println("####Titel####");
     Serial.println(String(info));
     Serial.println("-------------");
-    display.displayTitle(String(info));
+    display.displayTitle(info);
 }
 
 void audio_bitrate(const char *info) {
     Serial.println("####Bitrate####");
     Serial.println(String(info));
     Serial.println("-------------");
+    display.displayFooter(info);
 }
 
 void audio_showstation(const char *info){
@@ -87,6 +89,46 @@ void audio_showstation(const char *info){
     Serial.println(String(info));
     Serial.println("-------------");
 //    display.displayTitle(sinfo);
+}
+
+void changeStation(int _stationNo) {
+  char* _station[5];
+  Serial.println("M0-0");
+  if ( _stationNo > 1) {
+    _station[0] = station[_stationNo-2].name; 
+     Serial.println(String(station[_stationNo-2].name));
+  } else { 
+        _station[0] = NULL;
+  }
+  Serial.println("M0-1");
+  if ( _stationNo > 0) {
+    _station[1] = station[_stationNo-1].name; 
+     Serial.println(String(station[_stationNo-1].name));
+  } else { 
+        _station[1] = NULL;
+  }
+  Serial.println("M0-2");
+  _station[2] = station[_stationNo].name; 
+  Serial.println(String(station[_stationNo].name));
+  Serial.println("M0-3");
+  if ( _stationNo < STATIONS_NUM -1) {
+    _station[3] = station[_stationNo+1].name; 
+     Serial.println(String(station[_stationNo+1].name));
+  } else { 
+        _station[3] = NULL;
+  }
+  Serial.println("M0-4");
+  if ( _stationNo < STATIONS_NUM -2) {
+    _station[4] = station[_stationNo+2].name; 
+     Serial.println(String(station[_stationNo+2].name));
+  } else { 
+        _station[4] = NULL;
+  }
+  Serial.println("M1");
+  display.stationLayout();
+  Serial.println("M2");
+  display.displayStationSelect(_station);
+  Serial.println("M3");
 }
 
 void setup() {
@@ -103,6 +145,7 @@ void setup() {
     i++;
     display.displayWifiCon(i);
     Serial.print(".");
+    if (i>20) ESP.restart();
   }
   Serial.println();
   Serial.println("connected");
@@ -111,6 +154,10 @@ void setup() {
   initStations();
   configTzTime("CET-1CEST,M3.5.0/03,M10.5.0/03", ntp);
   if (! getLocalTime(&timeinfo)) ESP.restart();
+  Serial.println("Vor changeStation");
+  changeStation(3);
+  Serial.println("Nach changeStation");
+  delay(30000);
   audio.connecttohost(station[0].url);
   display.radioLayout();
   display.displayStation(station[stationNo].name);
@@ -138,11 +185,16 @@ void loop() {
     snprintf(sttime,sizeof(sttime),"%s","??. ??? ???? ??:??");
   }
   display.displayHeader(sttime, test_vol);
-  delay(1000);
+  delay(500);
   test_vol++;
   if (test_vol == 95 ) {
+    changeStation(stationNo);
+    delay(10000);
     stationNo++;
     if (stationNo > STATIONS_NUM-1) stationNo = 0;
+    changeStation(stationNo);
+    delay(10000);
+    display.radioLayout();
     if (audio.connecttohost(station[stationNo].url)) {
         display.displayStation(station[stationNo].name);
         display.displayTitle("");
