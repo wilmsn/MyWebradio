@@ -29,6 +29,7 @@ class MyDisplay {
     void displayStation(char *stationName);
     void displayTitle(const char* titleName);
     void displayHeader(char* dateTime, uint8_t myVol);
+    void displayFooter();
     void displayFooter(const char* _bps);
     // Ein Dialog zum Start des Wifi Netzes
     void displayWifi(const char* _ssid, bool isCon);

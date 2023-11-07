@@ -2,11 +2,13 @@
 #include "main.h"
 #include <WiFi.h> 
 #include "mydisplay.h"
+#include "myencoder.h"
 #include "Audio.h"
 
 #define STATIONS_NUM          10
 #define STATIONS_URL_SIZE     150
 #define STATIONS_NAME_SIZE    32
+#define LEV_OUTTIME           3000
 
 struct station_t
 {
@@ -15,16 +17,18 @@ struct station_t
 };
 
 station_t station[STATIONS_NUM];
-uint8_t stationNo = 0;
 
 MyDisplay display;
+MyEncoder encoder;
 Audio audio;
 
 
 char ntp[] = "de.pool.ntp.org";
 struct tm timeinfo;
-
-uint8_t test_vol = 0;
+char sttime[21];
+unsigned long levStart;
+uint8_t curVol = 20;
+uint8_t curStation = 0;
 
 void initStations() {
   
@@ -136,6 +140,10 @@ void setup() {
   Serial.print("WiFi ");
   display.begin();
   display.displayWifi(ssid,false);
+  encoder.initLev(0,curVol,0,100);
+  encoder.initLev(1,curStation,0,STATIONS_NUM-1);
+  encoder.initLev(2,0,0,100);
+  encoder.begin();
   WiFi.disconnect();
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
@@ -154,51 +162,92 @@ void setup() {
   initStations();
   configTzTime("CET-1CEST,M3.5.0/03,M10.5.0/03", ntp);
   if (! getLocalTime(&timeinfo)) ESP.restart();
-  Serial.println("Vor changeStation");
-  changeStation(3);
-  Serial.println("Nach changeStation");
-  delay(30000);
-  audio.connecttohost(station[0].url);
+  if (audio.connecttohost(station[curStation].url)) Serial.println("Audio connected");
   display.radioLayout();
-  display.displayStation(station[stationNo].name);
+  display.displayHeader(sttime, curVol);
+  display.displayStation(station[curStation].name);
+  Serial.println("Setup Ende");
 }
 
 void actionLevel_0() {
+  curVol = encoder.readPos();
   Serial.print("Lautstärke: ");
+  Serial.println(curVol);
+  display.displayHeader(sttime, curVol);
+  display.displayFooter();
+  audio.setVolume(curVol/5);
 }
 
 void actionLevel_1() {
+  curStation = encoder.readPos();
   Serial.print("Station: ");
+  Serial.println(station[curStation].name);
+  changeStation(curStation);
+  if (audio.connecttohost(station[curStation].url)) Serial.println("Audio connected");
 }
 
 void actionLevel_2() {
   Serial.print("Level 3: ");
+  Serial.println(encoder.readPos());
 }
 
 void loop() {
   audio.loop();
-  char sttime[21];
+  encoder.loop();
+  if ( levStart > 0) {
+    if ( millis() - levStart > LEV_OUTTIME ) {
+      encoder.setLev(0);
+      levStart = 0;
+    }
+  }
   if (getLocalTime(&timeinfo)) {
     //get date and time as a string
     strftime(sttime, sizeof(sttime), "%d. %b %Y %H:%M", &timeinfo);
   } else {
     snprintf(sttime,sizeof(sttime),"%s","??. ??? ???? ??:??");
   }
-  display.displayHeader(sttime, test_vol);
-  delay(500);
-  test_vol++;
-  if (test_vol == 95 ) {
-    changeStation(stationNo);
-    delay(10000);
-    stationNo++;
-    if (stationNo > STATIONS_NUM-1) stationNo = 0;
-    changeStation(stationNo);
-    delay(10000);
-    display.radioLayout();
-    if (audio.connecttohost(station[stationNo].url)) {
-        display.displayStation(station[stationNo].name);
-        display.displayTitle("");
+  if (encoder.newPos()) {
+    levStart = millis();
+    Serial.print("Level: ");
+    Serial.print(encoder.readLev());
+    Serial.print(" Position: ");
+    Serial.println(encoder.readPos());
+    switch (encoder.readLev()) {
+      case 0:
+        actionLevel_0();
+      break;
+      case 1:
+        actionLevel_1();
+      break;
+      case 2:
+        actionLevel_2();
+      break;
+      default:
+      break;
     }
   }
-  if (test_vol > 100) test_vol = 0;
+  if ( encoder.newLev() ) {
+    levStart = millis();
+    Serial.print("Level geschaltet: ");
+    Serial.print(encoder.readLev());
+    Serial.print(" Position: ");
+    Serial.println(encoder.readPos());
+    switch (encoder.readLev()) {
+      case 0:
+        display.radioLayout();
+        display.displayStation(station[curStation].name);
+        actionLevel_0();
+      break;
+      case 1:
+        display.stationLayout();
+        actionLevel_1();
+      break;
+      case 2:
+        display.clear();
+        actionLevel_2();
+      break;
+      default:
+      break;
+    }
+  }
 }

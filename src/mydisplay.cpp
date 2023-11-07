@@ -255,11 +255,14 @@ void MyDisplay::displayHeader(char* dateTime, uint8_t myVol) {
 }
 
 void MyDisplay::displayFooter(const char* _bps) {
-  tft.fillRect(0,115,159,12,ST77XX_BLUE);
+  displayFooter();
   tft.setTextSize(1);
   tft.setTextColor(ST7735_YELLOW);
   tft.setCursor(2,117);
   tft.print(String(_bps));
 }
 
+void MyDisplay::displayFooter() {
+  tft.fillRect(0,115,159,12,ST77XX_BLUE);
+}
 #endif
