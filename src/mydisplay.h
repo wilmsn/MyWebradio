@@ -20,7 +20,7 @@ class MyDisplay {
     // Löscht den Bildschirm (schwarz)
     void clear();
     // Ausgabe eines Textes mit Parametern
-    void DisplayText(uint8_t x0, uint8_t y0, uint8_t fontsize, String& text, uint16_t color);
+    void displayText(uint8_t x0, uint8_t y0, uint8_t fontsize, const char* text, uint16_t color);
     // Ein Dialog zur Stationswahl
     void stationLayout();
     void displayStationSelect(char* station[5]);

@@ -7,3 +7,6 @@
 #define MAGENTA 0xF81F
 #define YELLOW  0xFFE0
 #define ORANGE  0xFC00
+
+void show_radio();
+

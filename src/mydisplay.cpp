@@ -55,7 +55,7 @@ void MyDisplay::clear() {
   tft.fillRect(0,0,160,128,ST77XX_BLACK);
 }
 
-void MyDisplay::DisplayText(uint8_t x0, uint8_t y0, uint8_t fontsize, String& text, uint16_t color) {
+void MyDisplay::displayText(uint8_t x0, uint8_t y0, uint8_t fontsize, const char* text, uint16_t color) {
   tft.setTextSize(fontsize);
   tft.setTextColor(color);
   tft.setCursor(x0, y0);

@@ -114,6 +114,9 @@ void MyEncoder::begin() {
 
 void MyEncoder::loop() {
   if (rotary.encoderChanged()) {
+#ifdef SERIAL_DEBUG
+    Serial.println("Encoder changed");
+#endif
     curPos = rotary.readEncoder(); //get new value for gain
     levStore[curLev].curPos = curPos;
     posChanged = true;
